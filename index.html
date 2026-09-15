@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Idle ARPG</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #0d0f14;
+            color: #eeeeee;
+            font-family: Arial, sans-serif;
+        }
+
+        #game {
+            width: 100%;
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        button {
+            background: #292f3a;
+            color: white;
+            border: 1px solid #4a5260;
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .stat {
+            background: #181b22;
+            border: 1px solid #303641;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat span {
+            display: block;
+            font-size: 13px;
+            color: #9da5b3;
+        }
+
+        .stat strong {
+            display: block;
+            font-size: 20px;
+            margin-top: 4px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            background: #252a33;
+            border: 1px solid #3b424e;
+            border-radius: 10px;
+        }
+
+        .bottom {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .panel {
+            background: #181b22;
+            border: 1px solid #303641;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .bar {
+            height: 14px;
+            background: #30343d;
+            border-radius: 20px;
+            overflow: hidden;
+            margin: 6px 0 15px;
+        }
+
+        .fill {
+            height: 100%;
+            width: 0%;
+        }
+
+        .hp {
+            background: #d95c5c;
+        }
+
+        .xp {
+            background: #6798e6;
+        }
+
+        #status {
+            color: #b8bec9;
+            margin-top: 5px;
+        }
+
+        #log {
+            height: 120px;
+            overflow: hidden;
+            color: #aeb5c2;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        @media(max-width: 700px) {
+
+            #game {
+                padding: 10px;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .bottom {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="game">
+
+    <header>
+
+        <h1>⚔️ IDLE ARPG</h1>
+
+        <button onclick="resetGame()">
+            Resetar
+        </button>
+
+    </header>
+
+
+    <div class="stats">
+
+        <div class="stat">
+            <span>Nível</span>
+            <strong id="level">1</strong>
+        </div>
+
+        <div class="stat">
+            <span>Kills</span>
+            <strong id="kills">0</strong>
+        </div>
+
+        <div class="stat">
+            <span>Ouro</span>
+            <strong id="gold">0</strong>
+        </div>
+
+        <div class="stat">
+            <span>Dano</span>
+            <strong id="damage">10</strong>
+        </div>
+
+    </div>
+
+
+    <canvas
+        id="gameCanvas"
+        width="960"
+        height="540">
+    </canvas>
+
+
+    <div class="bottom">
+
+        <div class="panel">
+
+            <div>
+                Vida
+                <span id="hpText"></span>
+            </div>
+
+            <div class="bar">
+                <div
+                    id="hpBar"
+                    class="fill hp">
+                </div>
+            </div>
+
+
+            <div>
+                Experiência
+                <span id="xpText"></span>
+            </div>
+
+            <div class="bar">
+                <div
+                    id="xpBar"
+                    class="fill xp">
+                </div>
+            </div>
+
+
+            <div id="status">
+                Iniciando...
+            </div>
+
+        </div>
+
+
+        <div class="panel">
+
+            <strong>Registro</strong>
+
+            <div id="log"></div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const canvas = document.getElementById("gameCanvas");
+
+const ctx = canvas.getContext("2d");
+
+const W = canvas.width;
+const H = canvas.height;
+
+
+/* =========================
+   ESTADO DO JOGO
+========================= */
+
+let player = {
+
+    x: W / 2,
+    y: H / 2,
+
+    hp: 100,
+    maxHp: 100,
+
+    damage: 10,
+
+    level: 1,
+
+    xp: 0,
+    xpNeeded: 100,
+
+    attackCooldown: 0
+};
+
+
+let enemies = [];
+
+let kills = 0;
+
+let gold = 0;
+
+let spawnTimer = 0;
+
+let lastTime = performance.now();
+
+
+/* =========================
+   LOG
+========================= */
+
+function log(message) {
+
+    const element =
+        document.getElementById("log");
+
+    element.innerHTML =
+        "<div>" +
+        message +
+        "</div>" +
+        element.innerHTML;
+}
+
+
+/* =========================
+   INIMIGOS
+========================= */
+
+function spawnEnemy() {
+
+    const angle =
+        Math.random() * Math.PI * 2;
+
+    const distance =
+        180 + Math.random() * 120;
+
+    let x =
+        player.x +
+        Math.cos(angle) *
+        distance;
+
+    let y =
+        player.y +
+        Math.sin(angle) *
+        distance;
+
+
+    x = Math.max(
+        40,
+        Math.min(W - 40, x)
+    );
+
+    y = Math.max(
+        60,
+        Math.min(H - 40, y)
+    );
+
+
+    enemies.push({
+
+        x: x,
+        y: y,
+
+        hp: 30,
+        maxHp: 30,
+
+        speed:
+            30 + Math.random() * 20,
+
+        attackCooldown:
+            Math.random()
+
+    });
+}
+
+
+/* =========================
+   ALVO MAIS PRÓXIMO
+========================= */
+
+function getNearestEnemy() {
+
+    let nearest = null;
+
+    let nearestDistance = Infinity;
+
+
+    for (const enemy of enemies) {
+
+        const dx =
+            enemy.x - player.x;
+
+        const dy =
+            enemy.y - player.y;
+
+        const distance =
+            dx * dx + dy * dy;
+
+
+        if (distance < nearestDistance) {
+
+            nearestDistance = distance;
+
+            nearest = enemy;
+
+        }
+
+    }
+
+
+    return nearest;
+}
+
+
+/* =========================
+   XP
+========================= */
+
+function gainXP(amount) {
+
+    player.xp += amount;
+
+
+    if (
+        player.xp >=
+        player.xpNeeded
+    ) {
+
+        player.xp -=
+            player.xpNeeded;
+
+
+        player.level++;
+
+
+        player.xpNeeded =
+            Math.floor(
+                player.xpNeeded * 1.25
+            );
+
+
+        player.maxHp += 15;
+
+        player.hp =
+            player.maxHp;
+
+
+        player.damage += 3;
+
+
+        log(
+            "LEVEL UP! Você chegou ao nível " +
+            player.level
+        );
+
+    }
+
+}
+
+
+/* =========================
+   ATUALIZAÇÃO
+========================= */
+
+function update(delta) {
+
+    spawnTimer -= delta;
+
+    player.attackCooldown -= delta;
+
+
+    /* Spawn */
+
+    if (
+        spawnTimer <= 0 &&
+        enemies.length < 8
+    ) {
+
+        spawnEnemy();
+
+        spawnTimer = 1;
+
+    }
+
+
+    const target =
+        getNearestEnemy();
+
+
+    if (target) {
+
+        const dx =
+            target.x - player.x;
+
+        const dy =
+            target.y - player.y;
+
+        const distance =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+
+        /* Caminhar */
+
+        if (distance > 50) {
+
+            player.x +=
+                (dx / distance) *
+                110 *
+                delta;
+
+            player.y +=
+                (dy / distance) *
+                110 *
+                delta;
+
+        }
+
+
+        /* Ataque */
+
+        else if (
+            player.attackCooldown <= 0
+        ) {
+
+            target.hp -=
+                player.damage;
+
+
+            player.attackCooldown =
+                0.7;
+
+
+            if (target.hp <= 0) {
+
+                const index =
+                    enemies.indexOf(target);
+
+
+                enemies.splice(
+                    index,
+                    1
+                );
+
+
+                kills++;
+
+                gold += 5;
+
+
+                gainXP(25);
+
+
+                log(
+                    "Monstro derrotado! +25 XP / +5 ouro"
+                );
+
+            }
+
+        }
+
+    }
+
+
+    /* IA dos inimigos */
+
+    for (
+        const enemy of enemies
+    ) {
+
+        const dx =
+            player.x - enemy.x;
+
+        const dy =
+            player.y - enemy.y;
+
+        const distance =
+            Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
+
+
+        if (distance > 45) {
+
+            enemy.x +=
+                (dx / distance) *
+                enemy.speed *
+                delta;
+
+            enemy.y +=
+                (dy / distance) *
+                enemy.speed *
+                delta;
+
+        }
+
+
+        else {
+
+            enemy.attackCooldown -=
+                delta;
+
+
+            if (
+                enemy.attackCooldown <= 0
+            ) {
+
+                player.hp -= 5;
+
+
+                enemy.attackCooldown =
+                    1.2;
+
+
+                if (player.hp <= 0) {
+
+                    player.hp =
+                        player.maxHp;
+
+
+                    player.x =
+                        W / 2;
+
+                    player.y =
+                        H / 2;
+
+
+                    log(
+                        "Você morreu e voltou ao centro."
+                    );
+
+                }
+
+            }
+
+        }
+
+    }
+
+}
+
+
+/* =========================
+   DESENHO
+========================= */
+
+function draw() {
+
+    ctx.clearRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /* Fundo */
+
+    ctx.fillStyle =
+        "#252a33";
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /* Grade */
+
+    ctx.strokeStyle =
+        "#303641";
+
+
+    for (
+        let x = 0;
+        x < W;
+        x += 40
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            0
+        );
+
+        ctx.lineTo(
+            x,
+            H
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    for (
+        let y = 0;
+        y < H;
+        y += 40
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            0,
+            y
+        );
+
+        ctx.lineTo(
+            W,
+            y
+        );
+
+        ctx.stroke();
+
+    }
+
+
+    /* Inimigos */
+
+    for (
+        const enemy of enemies
+    ) {
+
+        ctx.fillStyle =
+            "#d65f5f";
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            enemy.x,
+            enemy.y,
+            17,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+
+        ctx.fillStyle =
+            "#f09a76";
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            enemy.x,
+            enemy.y,
+            9,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fill();
+
+
+        /* Barra de vida */
+
+        ctx.fillStyle =
+            "#30343d";
+
+
+        ctx.fillRect(
+            enemy.x - 20,
+            enemy.y - 28,
+            40,
+            5
+        );
+
+
+        ctx.fillStyle =
+            "#e05b5b";
+
+
+        ctx.fillRect(
+            enemy.x - 20,
+            enemy.y - 28,
+            40 *
+            (enemy.hp /
+            enemy.maxHp),
+            5
+        );
+
+    }
+
+
+    /* Jogador */
+
+    ctx.fillStyle =
+        "#6ea8ff";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        player.x,
+        player.y,
+        20,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+
+    ctx.fillStyle =
+        "#ffffff";
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        player.x,
+        player.y,
+        9,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+}
+
+
+/* =========================
+   INTERFACE
+========================= */
+
+function updateUI() {
+
+    document.getElementById(
+        "level"
+    ).textContent =
+        player.level;
+
+
+    document.getElementById(
+        "kills"
+    ).textContent =
+        kills;
+
+
+    document.getElementById(
+        "gold"
+    ).textContent =
+        gold;
+
+
+    document.getElementById(
+        "damage"
+    ).textContent =
+        player.damage;
+
+
+    document.getElementById(
+        "hpText"
+    ).textContent =
+        Math.ceil(player.hp) +
+        " / " +
+        player.maxHp;
+
+
+    document.getElementById(
+        "xpText"
+    ).textContent =
+        player.xp +
+        " / " +
+        player.xpNeeded;
+
+
+    document.getElementById(
+        "hpBar"
+    ).style.width =
+        (
+            player.hp /
+            player.maxHp *
+            100
+        ) + "%";
+
+
+    document.getElementById(
+        "xpBar"
+    ).style.width =
+        (
+            player.xp /
+            player.xpNeeded *
+            100
+        ) + "%";
+
+
+    document.getElementById(
+        "status"
+    ).textContent =
+
+        enemies.length > 0
+
+        ? "Combate automático — " +
+          enemies.length +
+          " inimigos"
+
+        : "Procurando inimigos...";
+
+}
+
+
+/* =========================
+   LOOP
+========================= */
+
+function gameLoop(time) {
+
+    const delta =
+        Math.min(
+            0.05,
+            (time - lastTime) / 1000
+        );
+
+
+    lastTime = time;
+
+
+    update(delta);
+
+    draw();
+
+    updateUI();
+
+
+    requestAnimationFrame(
+        gameLoop
+    );
+
+}
+
+
+/* =========================
+   RESET
+========================= */
+
+function resetGame() {
+
+    location.reload();
+
+}
+
+
+/* =========================
+   INÍCIO
+========================= */
+
+for (
+    let i = 0;
+    i < 5;
+    i++
+) {
+
+    spawnEnemy();
+
+}
+
+
+log(
+    "Jogo iniciado. Combate automático ativado."
+);
+
+
+requestAnimationFrame(
+    gameLoop
+);
+
+</script>
+
+</body>
+</html>
